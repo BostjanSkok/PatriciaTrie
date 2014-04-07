@@ -11,35 +11,34 @@ public class Patricia<T> {
     //Ustvarimo korensko vozlisce
     private PatriciaNode<T> root = new PatriciaNode<T>(false, "", null);
 
-    public void Vstavi(String key, T data)throws Exception {
+    public void Vstavi(String key, T data) throws Exception {
         Vstavi(this.root, key, data);
     }
 
-    public T Najdi(String key){
-        return find(root,key);
+    public T Najdi(String key) {
+        return find(root, key);
     }
 
     private T find(PatriciaNode<T> node, String key) {
-      int found= node.FoundInKey(key);
-        if(node.GetKey().equals("") == true  || found<key.length() && found<node.GetKey().length())
-        {
+        int found = node.FoundInKey(key);
+        if (node.GetKey().equals("") == true || found < key.length() && found < node.GetKey().length()) {
             //Iscemo potomca ki se zcne z prvmi znakom kljuca
             String noviKljuc = key.substring(found, key.length());
             for (PatriciaNode<T> potomec : node.VrniPotomce()) {
                 if (potomec.GetKey().startsWith(noviKljuc.charAt(0) + "")) {
-                   return find(potomec, noviKljuc);
+                    return find(potomec, noviKljuc);
                 }
             }
             return null;
-        }else if(found==key.length() && node.GetKey().length()==found){
-            if(node.isLeaf)
+        } else if (found == key.length() && node.GetKey().length() == found) {
+            if (node.isLeaf)
                 return node.data;
             return null;
         }
         return null;
     }
 
-    private void Vstavi(PatriciaNode<T> node, String key, T data)throws Exception{
+    private void Vstavi(PatriciaNode<T> node, String key, T data) throws Exception {
 
         int zadetki = node.FoundInKey(key);
 
@@ -75,7 +74,7 @@ public class Patricia<T> {
             //V tem primer smo dobili celoten niz v vozliscu
             node.MakeLeaf(data);
 
-        }else{
+        } else {
             // Prisli smo do konca iskanja moramo dodati novo vozlisce
             PatriciaNode<T> novi = new PatriciaNode<T>(true, key.substring(zadetki, key.length()), data);
             node.DodajPotomca(novi);
@@ -84,10 +83,53 @@ public class Patricia<T> {
 
     }
 
+    public T Brisi(String key) throws Exception {
+        return brisi(key, null, root);
+    }
+
+    /**
+     *
+     * @param key kljuc ki brisemo
+     * @param parent stars vozlisca
+     * @param node vozlisce
+     * @return Vrnemo podatek tipa T ki je shranjen na kljucu ce kljuc ne obstaja null
+     * @throws Exception  napaka v primeru da se kljuce zdruzi na vozliscu ki nima tocno enega potomca
+     * */
+    private T brisi(String key, PatriciaNode<T> parent, PatriciaNode<T> node) throws Exception {
+
+        int found = node.FoundInKey(key);
+        if (node.GetKey().equals("") == true || found < key.length() && found < node.GetKey().length()) {
+            //Iscemo potomca ki se zcne z prvmi znakom kljuca
+            String noviKljuc = key.substring(found, key.length());
+            for (PatriciaNode<T> potomec : node.VrniPotomce()) {
+                if (potomec.GetKey().startsWith(noviKljuc.charAt(0) + "")) {
+                    return brisi(noviKljuc, node, potomec);
+                }
+            }
+            return null;
+        } else if (found == key.length() && node.GetKey().length() == found) {
+            if (node.isLeaf) {
+                //Nasli smo list za izbrisati
+                if (node.NumberOfChildren() == 0) {
+                    //list odstranimo
+                    parent.OdstraniPotomca(node);
+                    if (parent.NumberOfChildren() == 1 && !parent.isLeaf && !parent.GetKey().equals("")) {
+                        //Ce ima stars samo se enega potomca ki ni list ne koren patricije jih zdruzimo
+                        parent.Zdruzi();
+                    }
+                }
+                return node.data;
+            }
+
+            return null;
+        }
+        return null;
+    }
+
     private class PatriciaNode<T> {
 
-        private boolean isLeaf;
-        private T data;
+        private boolean isLeaf; // pove ce je vozlisce konce kljuca
+        private T data; //podatek hranjen
         private String key;
 
         private List<PatriciaNode<T>> children;
@@ -108,12 +150,15 @@ public class Patricia<T> {
             return key;
         }
 
+        public int NumberOfChildren() {
+            return children.size();
+        }
 
         private int FoundInKey(String toFind) {
             for (int i = 0; i < key.length(); i++) {
                 //ce smo prisli do konca iskanega niza  ali ce se znaki ne ujemajo  vrnemo pozicijo ozirma i
-                if (toFind.length()-1 <= i || key.charAt(i) != toFind.charAt(i)) {
-                    return i+1;
+                if (toFind.length() - 1 <= i || key.charAt(i) != toFind.charAt(i)) {
+                    return i + 1;
                 }
             }
             return 0;
@@ -126,24 +171,38 @@ public class Patricia<T> {
 
         public void RazdeliPoKljucu(int zdetki) {
             PatriciaNode<T> noviOtrok = new PatriciaNode<T>(this.isLeaf, this.key.substring(zdetki, this.key.length()), this.data);
-            noviOtrok.children=this.children;
+            noviOtrok.children = this.children;
             this.DodajPotomca(noviOtrok);
 
-            this.key= this.key.substring(0,zdetki);
-            this.data=null;
-            this.isLeaf=false;
+            this.key = this.key.substring(0, zdetki);
+            this.data = null;
+            this.isLeaf = false;
 
         }
 
 
-        public void MakeLeaf(T data)throws Exception {
+        public void MakeLeaf(T data) throws Exception {
             //Preverimo ce je ze list pomeni da je prislo do dvakratnega ustavljanja istega kljuca kar povzroci napako
-            if(this.isLeaf)
+            if (this.isLeaf)
                 throw new Exception("Dvojni kljuc");
 
-            this.isLeaf=true;
-            this.data=data;
+            this.isLeaf = true;
+            this.data = data;
 
+        }
+
+        public void OdstraniPotomca(PatriciaNode<T> node) {
+            children.remove(node);
+        }
+
+        public void Zdruzi() throws Exception {
+            if (this.children.size() != 1)
+                throw new Exception("Zdruzevanje v vozlisca ki nima  enega potomca");
+
+            PatriciaNode<T> node = children.get(0);
+            this.key += node.key;
+            this.data = node.data;
+            this.isLeaf = node.isLeaf;
         }
     }
 
